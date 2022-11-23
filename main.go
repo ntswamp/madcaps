@@ -1,25 +1,14 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"net/http"
-	"server/constant"
-	util "server/util/log"
+	"server/handler"
 )
 
 func main() {
 	mux := http.NewServeMux()
-	mux.HandleFunc("/ping", func(writer http.ResponseWriter, request *http.Request) {
-		switch request.Method {
-		case "GET":
-			writer.WriteHeader(http.StatusOK)
-			fmt.Fprint(writer, "pong")
-			util.Log(constant.LOG_INFO, "received a GET request from: (%s)", request.Host)
-		default:
-			http.NotFound(writer, request)
-		}
-	})
+	mux.HandleFunc("/check", handler.HealthCheck)
 	s := &http.Server{
 		Addr:    ":9777",
 		Handler: mux,
