@@ -1,5 +1,5 @@
 package model
 
 type Account struct {
-	Email string
+	Email string //primary key
 }
