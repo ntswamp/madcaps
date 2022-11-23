@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"server/constant"
-	"server/util/log"
+	"server/lib/log"
 )
 
 func HealthCheck(w http.ResponseWriter, r *http.Request) {
