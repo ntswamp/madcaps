@@ -1,0 +1,67 @@
+version: '3'
+services:
+  go:
+    build: 
+      context: .
+      dockerfile: ./docker/go/Dockerfile
+    container_name: go
+    tty: true
+    links:
+      - db
+      - redis
+    volumes:
+      - .:/home/madcaps
+    networks:
+      - madnet
+    ports:
+      - 9090:9090
+    env_file:
+      - ./docker/go/go.env
+    restart: always
+  redis:
+    image: redis:latest
+    command: bash -c '/usr/local/bin/redis-server /usr/local/etc/redis/redis.conf'
+    container_name: redis
+    networks:
+      - madnet
+    ports:
+      - 6379:6379
+    volumes:
+      - ./docker/redis:/usr/local/etc/redis
+    restart: always
+  db:
+    container_name: db
+    image: postgres:latest
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: madcaps
+      PGDATA: /var/lib/postgresql/data/pgdata
+      TZ: "Asia/Tokyo"
+    volumes:
+      - ./docker/db/db.sql:/docker-entrypoint-initdb.d/db.sql
+      - ./docker/db/data:/var/lib/postgresql/data
+    networks:
+      - madnet
+    ports:
+      - 5432:5432
+  adminer:
+    image: adminer
+    container_name: adminer
+    environment:
+      ADMINER_DEFAULT_DB_DRIVER: pgsql
+      ADMINER_DEFAULT_DB_HOST: db
+      ADMINER_DEFAULT_DB_NAME: madcaps
+    restart: always
+    links:
+      - db
+    networks:
+      - madnet
+    ports:
+      - 8080:8080
+networks:
+  madnet:
+    driver: bridge
+    ipam:
+      driver: default
