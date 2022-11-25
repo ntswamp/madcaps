@@ -16,9 +16,7 @@ func saveCache(model interface{}) error {
 		return errors.New("passed in model must be a pointer")
 	}
 
-	rc := redis.NewClient(&redis.Options{
-		Addr: ":6379",
-	})
+	rc := redisClient()
 
 	key := t.Elem().Name()
 	ctx := context.Background()
@@ -57,9 +55,7 @@ func getCache(destModel interface{}) error {
 		return errors.New("passed in model must be a pointer")
 	}
 
-	rc := redis.NewClient(&redis.Options{
-		Addr: ":6379",
-	})
+	rc := redisClient()
 
 	key := t.Elem().Name()
 	ctx := context.Background()
@@ -87,13 +83,13 @@ func getPkeyValue(model interface{}) string {
 	return fmt.Sprintf("%v", pkeyVal)
 }
 
-func cacheClient() *redis.Client {
-	rdb := redis.NewClient(&redis.Options{
+func redisClient() *redis.Client {
+	rc := redis.NewClient(&redis.Options{
 		Addr:     "localhost:6379",
 		Password: "", // no password set
 		DB:       0,  // use default DB
 	})
-	return rdb
+	return rc
 }
 
 /*
