@@ -5,7 +5,7 @@ import "github.com/go-redis/redis/v9"
 // always look into cache first, go DB if no cache is found.
 func Get(model interface{}) error {
 
-	err := getCache(model)
+	err := GetCache(model)
 	//no cache for this query, 1)fetch from db. 2)cache the record.
 	if err == redis.Nil {
 

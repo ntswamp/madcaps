@@ -10,7 +10,7 @@ import (
 	"github.com/go-redis/redis/v9"
 )
 
-func saveCache(model interface{}) error {
+func SaveCache(model interface{}) error {
 	t := reflect.TypeOf(model)
 	if t.Kind() != reflect.Ptr {
 		return errors.New("passed in model must be a pointer")
@@ -49,7 +49,7 @@ func saveCache(model interface{}) error {
 	*/
 }
 
-func getCache(destModel interface{}) error {
+func GetCache(destModel interface{}) error {
 	t := reflect.TypeOf(destModel)
 	if t.Kind() != reflect.Ptr {
 		return errors.New("passed in model must be a pointer")
