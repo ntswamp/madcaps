@@ -30,6 +30,7 @@ services:
       - ./docker/redis:/usr/local/etc/redis
     restart: always
   db:
+    user: "1000:1000"
     container_name: db
     image: postgres:latest
     restart: always
@@ -37,7 +38,6 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: password
       POSTGRES_DB: madcaps
-      PGDATA: /var/lib/postgresql/data/pgdata
       TZ: "Asia/Tokyo"
     volumes:
       - ./docker/db/db.sql:/docker-entrypoint-initdb.d/db.sql
