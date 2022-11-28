@@ -2,24 +2,65 @@ package db
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"log"
+	"reflect"
 
+	"github.com/georgysavva/scany/v2/pgxscan"
 	"github.com/go-redis/redis/v9"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // always look into cache first, go DB if no cache is found.
-func (c *Client) Get(model interface{}) error {
+func (c *Client) Get(dest interface{}) error {
+	modelType := reflect.TypeOf(dest)
+	ctx := context.Background()
 
-	err := c.GetCache(model)
-	//no cache for this query, 1)fetch from db. 2)cache the record.
-	if err == redis.Nil {
+	switch modelType.Kind() {
+	case reflect.Slice:
+		slice := reflect.ValueOf(dest)
+		if slice.Index(0).Kind() != reflect.Ptr {
+			return errors.New("destination must be a pointer slice")
+		}
+		table := modelType.Elem().Elem().Name()
+		sql := fmt.Sprintf("SELECT * FROM %s", table)
+		//look into cache
+		if c.Cache != nil {
+			if _, err := c.Cache.Pipelined(ctx, func(p redis.Pipeliner) error {
+				for i := 0; i < slice.Len(); i++ {
+					log.Printf("the %d rounds\nmax:%d rounds", i+1, slice.Len())
+					ithValue := reflect.Indirect(slice.Index(i))
+					log.Printf("%v\n", ithValue)
+					//pkeyVal := reflect.ValueOf(ithValue.Field(0).Interface())
+					//field := fmt.Sprintf("%v", pkeyVal)
+
+					err := c.GetCache(&ithValue)
+					switch {
+					//no cache for this query, 1)fetch from db. 2)cache the record.
+					case err == redis.Nil:
+						err := pgxscan.Select(ctx, c.Pool, &dest, sql)
+						if err != nil {
+							panic(err)
+						}
+						//save to cache
+						c.SaveCache(&ithValue)
+					case err != nil:
+						panic(err)
+					}
+
+				}
+				return nil
+			}); err != nil {
+				panic(err)
+			}
+
+		}
+
+	default:
+		//handle errors
 
 	}
-	if err != nil {
-		return err
-	}
-
 	return nil
 }
 

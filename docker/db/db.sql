@@ -7,15 +7,14 @@
 -- ACCOUNT-RELATED
 -- ================================================================
 
-DROP TABLE IF EXISTS "accounts";
-CREATE TABLE "public"."accounts" (
-    "wallet_address" text NOT NULL PRIMARY KEY,
-    "user_id" bigserial NOT NULL,
-    "username" text,
-    "language" text,
-    "api_token" text,
-    "sst_wei" text DEFAULT 0,
-    "sbg_wei" text DEFAULT 0,
+DROP TABLE IF EXISTS "account";
+CREATE TABLE "public"."account" (
+    "id" bigserial NOT NULL PRIMARY KEY,
+    "name" text,
+    "email" text,
+    "power" integer,
+    "age" integer,
+    "bot" jsonb,
     "created_at" timestamp with time zone NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) WITH (oids = false);
-CREATE UNIQUE INDEX idx_accounts_user_id ON accounts(user_id);
+CREATE UNIQUE INDEX idx_account_user_id ON account(user_id);

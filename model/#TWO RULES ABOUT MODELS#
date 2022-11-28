@@ -1,0 +1,6 @@
+*****************RULE NO.1*****************
+!The First Field of EVERY Models Defined Below Must Be Its PRIMARY KEY If It Has One!
+
+
+*****************RULE NO.2*****************
+!Model Names Must Be Exactly Same to the TABLE NAME You Defined In the Databases. Cases Are Irrelevant Though!

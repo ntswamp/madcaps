@@ -35,7 +35,7 @@ func (c *Client) SaveCache(model interface{}) error {
 	case reflect.Slice:
 		slice := reflect.ValueOf(model)
 		if slice.Index(0).Kind() != reflect.Ptr {
-			return errors.New("multiple models must be passed in as pointer slice")
+			return errors.New("multiple models must be passed in as a pointer slice")
 		}
 
 		key := modelType.Elem().Elem().Name()
