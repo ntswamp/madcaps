@@ -10,6 +10,7 @@ import (
 	"github.com/go-redis/redis/v9"
 )
 
+// pass in pointer or slice of pointers
 func (c *Client) SaveCache(model interface{}) error {
 	modelType := reflect.TypeOf(model)
 	ctx := context.Background()
@@ -32,8 +33,12 @@ func (c *Client) SaveCache(model interface{}) error {
 
 	//cache multiple objects by passing in a pointer slice e.g., []*Bob{&a,&b,&c}
 	case reflect.Slice:
-		key := modelType.Elem().Elem().Name()
 		slice := reflect.ValueOf(model)
+		if slice.Index(0).Kind() != reflect.Ptr {
+			return errors.New("passed in models must be in the form of pointer slice")
+		}
+
+		key := modelType.Elem().Elem().Name()
 		if _, err := c.Cache.Pipelined(ctx, func(p redis.Pipeliner) error {
 			for i := 0; i < slice.Len(); i++ {
 				modelValue := reflect.Indirect(slice.Index(i))
