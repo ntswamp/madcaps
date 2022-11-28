@@ -27,32 +27,27 @@ func (c *Client) Get(dest interface{}) error {
 		sql := fmt.Sprintf("SELECT * FROM %s", table)
 		//look into cache
 		if c.Cache != nil {
-			if _, err := c.Cache.Pipelined(ctx, func(p redis.Pipeliner) error {
-				for i := 0; i < slice.Len(); i++ {
-					log.Printf("the %d rounds\nmax:%d rounds", i+1, slice.Len())
-					ithValue := reflect.Indirect(slice.Index(i))
-					log.Printf("%v\n", ithValue)
-					//pkeyVal := reflect.ValueOf(ithValue.Field(0).Interface())
-					//field := fmt.Sprintf("%v", pkeyVal)
-
-					err := c.GetCache(&ithValue)
-					switch {
-					//no cache for this query, 1)fetch from db. 2)cache the record.
-					case err == redis.Nil:
-						err := pgxscan.Select(ctx, c.Pool, &dest, sql)
-						if err != nil {
-							panic(err)
-						}
-						//save to cache
-						c.SaveCache(&ithValue)
-					case err != nil:
+			for i := 0; i < slice.Len(); i++ {
+				log.Printf("the %d rounds\nmax:%d rounds", i+1, slice.Len())
+				ithValue := reflect.Indirect(slice.Index(i))
+				log.Printf("%v\n", slice.Index(i))
+				//pkeyVal := reflect.ValueOf(ithValue.Field(0).Interface())
+				//field := fmt.Sprintf("%v", pkeyVal)
+				//vp := reflect.New(reflect.TypeOf(ithValue))
+				err := c.GetCache(&ithValue)
+				switch {
+				//no cache for this query, 1)fetch from db. 2)cache the record.
+				case err == redis.Nil:
+					err := pgxscan.Select(ctx, c.Pool, &dest, sql)
+					if err != nil {
 						panic(err)
 					}
-
+					//save to cache
+					c.SaveCache(&ithValue)
+				case err != nil:
+					panic(err)
 				}
-				return nil
-			}); err != nil {
-				panic(err)
+
 			}
 
 		}

@@ -90,7 +90,6 @@ func (c *Client) GetCache(destModel interface{}) error {
 	switch destType.Kind() {
 	//get single cache
 	case reflect.Ptr:
-
 		key := destType.Elem().Name()
 		field := getPkeyValue(destModel)
 
