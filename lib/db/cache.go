@@ -10,29 +10,57 @@ import (
 	"github.com/go-redis/redis/v9"
 )
 
-func SaveCache(model interface{}) error {
-	t := reflect.TypeOf(model)
-	if t.Kind() != reflect.Ptr {
-		return errors.New("passed in model must be a pointer")
-	}
-
-	rc := redisClient()
-
-	key := t.Elem().Name()
+func (c *Client) SaveCache(model interface{}) error {
+	modelType := reflect.TypeOf(model)
 	ctx := context.Background()
-	//modelVal := reflect.ValueOf(model).Elem()
-	field := getPkeyValue(model)
 
-	val, err := json.Marshal(model)
-	if err != nil {
+	switch modelType.Kind() {
+	//cache single object by passing in a pointer
+	case reflect.Ptr:
+		key := modelType.Elem().Name()
+		field := getPkeyValue(model)
+
+		val, err := json.Marshal(model)
+		if err != nil {
+			return nil
+		}
+		err = c.Cache.HSet(ctx, key, field, val).Err()
+		if err != nil {
+			return err
+		}
 		return nil
-	}
-	err = rc.HSet(ctx, key, field, val).Err()
-	if err != nil {
-		return err
+
+	//cache multiple objects by passing in a pointer slice e.g., []*Bob{&a,&b,&c}
+	case reflect.Slice:
+		key := modelType.Elem().Elem().Name()
+		slice := reflect.ValueOf(model)
+		if _, err := c.Cache.Pipelined(ctx, func(p redis.Pipeliner) error {
+			for i := 0; i < slice.Len(); i++ {
+				modelValue := reflect.Indirect(slice.Index(i))
+				pkeyVal := reflect.ValueOf(modelValue.Field(0).Interface())
+				field := fmt.Sprintf("%v", pkeyVal)
+				//serialize
+				val, err := json.Marshal(modelValue.Interface())
+				if err != nil {
+					return err
+				}
+
+				err = p.HSet(ctx, key, field, val).Err()
+				if err != nil {
+					return err
+				}
+
+			}
+			return nil
+		}); err != nil {
+			panic(err)
+		}
+		return nil
+
+	default:
+		return errors.New("passed in model(s) must be a pointer or a slice of pointers")
 	}
 
-	return nil
 	/*
 		key := makeCacheKeyName(model)
 		if _, err := rc.Pipelined(ctx, func(p redis.Pipeliner) error {
@@ -49,25 +77,29 @@ func SaveCache(model interface{}) error {
 	*/
 }
 
-func GetCache(destModel interface{}) error {
-	t := reflect.TypeOf(destModel)
-	if t.Kind() != reflect.Ptr {
+func (c *Client) GetCache(destModel interface{}) error {
+
+	ctx := context.Background()
+	destType := reflect.TypeOf(destModel)
+
+	switch destType.Kind() {
+	//get single cache
+	case reflect.Ptr:
+
+		key := destType.Elem().Name()
+		field := getPkeyValue(destModel)
+
+		val, err := c.Cache.HGet(ctx, key, field).Bytes()
+		if err != nil {
+			return err
+		}
+
+		json.Unmarshal(val, destModel)
+		return nil
+
+	default:
 		return errors.New("passed in model must be a pointer")
 	}
-
-	rc := redisClient()
-
-	key := t.Elem().Name()
-	ctx := context.Background()
-	field := getPkeyValue(destModel)
-
-	val, err := rc.HGet(ctx, key, field).Bytes()
-	if err != nil {
-		return err
-	}
-
-	json.Unmarshal(val, destModel)
-	return nil
 }
 
 // the first field of passed in model is supposed to be the primary key.

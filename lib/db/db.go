@@ -2,7 +2,6 @@ package db
 
 import (
 	"context"
-	"fmt"
 	"log"
 
 	"github.com/go-redis/redis/v9"
@@ -10,9 +9,9 @@ import (
 )
 
 // always look into cache first, go DB if no cache is found.
-func Get(model interface{}) error {
+func (c *Client) Get(model interface{}) error {
 
-	err := GetCache(model)
+	err := c.GetCache(model)
 	//no cache for this query, 1)fetch from db. 2)cache the record.
 	if err == redis.Nil {
 
@@ -47,7 +46,8 @@ func New() *Client {
 	if err != nil {
 		log.Fatal(err)
 	}
-	fmt.Printf("%+v\n", pool.Stat())
+	//DEBUG
+	//fmt.Printf("%+v\n", pool.Stat())
 
 	redis := redisClient()
 
@@ -57,15 +57,20 @@ func New() *Client {
 	}
 }
 
-func (c *Client) Insert(model string) error {
+/*
+func (c *Client) Insert(model interface{}) error {
 	ctx := context.Background()
+	/* in normal cases you don't need to Acquire a connection manually,
+	you call the query methods on the pool directly.
+	Then you don't have to worry about releasing the connection (only about closing Rows).
 	conn, err := c.Pool.Acquire(ctx)
 	if err != nil {
 		return err
 	}
 	defer conn.Release()
 
-	_, err = conn.Query(context.Background(), model)
+
+	_, err = c.Pool.Query(context.Background(), model)
 	if err != nil {
 		return err
 	}
@@ -76,3 +81,4 @@ func (c *Client) Insert(model string) error {
 
 	return nil
 }
+*/
