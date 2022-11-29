@@ -96,7 +96,7 @@ func (c *Client) Upsert(model interface{}) error {
 
 		_, err := c.Db.NewInsert().
 			Model(slice.Index(i).Interface()).
-			On("CONFLICT ?PKs DO UPDATE").
+			On("CONFLICT (?PKs) DO UPDATE").
 			Exec(ctx)
 		if err != nil {
 			return err

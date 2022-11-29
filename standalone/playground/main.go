@@ -1,10 +1,11 @@
 package main
 
 import (
-	"database/sql"
 	"fmt"
+	"math/big"
 	"server/lib/db"
 	"server/model"
+	"time"
 )
 
 func main() {
@@ -12,51 +13,20 @@ func main() {
 	db := db.New()
 	defer db.Close()
 
-	accounts := []*model.Account{{Id: 1}, {Id: 2}, {Id: 4}}
-	err := db.Get(&accounts)
+	m := &model.Account{Id: 88, Email: "asd@sscas.com", Name: "Mike", Age: 13, Power: big.NewInt(-25433343), Bot: &model.Bee{Size: 8, Amount: big.NewInt(731287784327)}, CreatedAt: time.Now()}
+	t := &model.Account{Id: 99, Email: "huifwe@fas.com", Name: "Tom", Age: 63, Power: big.NewInt(999974637), Bot: &model.Bee{Size: 12, Amount: big.NewInt(4932954387784327)}, CreatedAt: time.Now()}
+	err := db.Upsert(&[]*model.Account{m, t})
 	if err != nil {
-		if err == sql.ErrNoRows {
-			panic(err)
-		}
-	}
-	for _, a := range accounts {
-		fmt.Println(*a)
+		panic(err)
 	}
 
-	/*
-		{
-			//REDIS
-			m := Account{Id: 88, Email: "asd@sscas.com", Name: "Mike", Age: 13, Power: -992239, Bot: &Bee{Size: 8}, CreatedAt: time.Now()}
-			t := Account{Id: 99, Email: "huifwe@fas.com", Name: "Tom", Age: 63, Power: 2342423442, Bot: &Bee{Size: 12}, CreatedAt: time.Now()}
-			err := db.SaveCache([]Account{m, t})
-			if err != nil {
-				panic(err)
-			}
+	dest := []*model.Account{{Id: 88}, {Id: 99}}
+	err = db.Get(&dest)
+	if err != nil {
+		panic(err)
+	}
 
-			mike := &Account{Id: 88}
-			tom := &Account{Id: 99}
-			err = db.GetCache(mike)
-			if err != nil {
-				fmt.Println(err)
-			}
-			if err == redis.Nil {
-				println("no 88!")
-			}
-
-			err = db.GetCache(tom)
-			if err != nil {
-				fmt.Println(err)
-			}
-			if err == redis.Nil {
-				println("no 99!")
-			}
-
-			fmt.Println(mike)
-			fmt.Println(tom)
-
-			m.Power = 8888888888888
-			db.SaveCache(m)
-		}
-	*/
+	fmt.Println(*&(dest[0]).Bot.Size)
+	fmt.Println(*(dest[1]).Bot.Amount)
 
 }

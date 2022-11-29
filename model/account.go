@@ -9,13 +9,13 @@ import (
 
 type Bee struct {
 	Size   uint8
-	Amount big.Int
+	Amount *big.Int
 }
 
 type Account struct {
-	Id        uint64 `bun:"id,pk"`
+	Id        uint64 `bun:"id,pk,autoincrement"`
 	Email     string
-	Power     int64
+	Power     *big.Int
 	Age       int64
 	CreatedAt time.Time
 	Name      string
