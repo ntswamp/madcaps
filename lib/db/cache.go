@@ -19,7 +19,7 @@ func (c *Client) SaveCache(model interface{}) error {
 	//cache single object by passing in a pointer
 	case reflect.Ptr:
 		key := modelType.Elem().Name()
-		field := GetPkeyValue(model)
+		field := getPkeyValue(model)
 
 		val, err := json.Marshal(model)
 		if err != nil {
@@ -83,6 +83,9 @@ func (c *Client) SaveCache(model interface{}) error {
 }
 
 func (c *Client) GetCache(destModel interface{}) error {
+	if c.Cache == nil {
+		return redis.Nil
+	}
 
 	ctx := context.Background()
 	destType := reflect.TypeOf(destModel)
@@ -91,7 +94,7 @@ func (c *Client) GetCache(destModel interface{}) error {
 	//get single cache
 	case reflect.Ptr:
 		key := destType.Elem().Name()
-		field := GetPkeyValue(destModel)
+		field := getPkeyValue(destModel)
 
 		val, err := c.Cache.HGet(ctx, key, field).Bytes()
 		if err != nil {
@@ -107,7 +110,7 @@ func (c *Client) GetCache(destModel interface{}) error {
 }
 
 // the first field of passed in model is supposed to be the primary key.
-func GetPkeyValue(model interface{}) string {
+func getPkeyValue(model interface{}) string {
 	t := reflect.TypeOf(model)
 	if t.Kind() != reflect.Ptr {
 		panic("passed in model must be a pointer")

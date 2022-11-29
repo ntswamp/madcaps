@@ -14,46 +14,46 @@ import (
 
 // accept a pointer to a slice of pointers e.g., &[]*Bob{{Id:1},{Id:2},{Id:3}}
 func (c *Client) Get(dest interface{}) error {
-	modelType := reflect.TypeOf(dest)
 	ctx := context.Background()
-
+	destType := reflect.TypeOf(dest)
 	destVal := reflect.ValueOf(dest)
 	slice := destVal.Elem()
 	//resultSlice := reflect.MakeSlice(slice.Elem().Type(), 0, 0)
 	if slice.Index(0).Kind() != reflect.Ptr {
 		return errors.New("destination must be a pointer slice")
 	}
-	tableName := modelType.Elem().Elem().Elem().Name()
-	log.Println("Table Name:", tableName)
+	tableName := destType.Elem().Elem().Elem().Name()
+	pKeyName := slice.Index(0).Type().Elem().Field(0).Name
+
+	log.Println("Table Name:", tableName, ", Pkey Name:", pKeyName)
 
 	//look into cache
-	if c.Cache != nil {
-		for i := 0; i < slice.Len(); i++ {
-			log.Printf("the %d rounds\nmax:%d rounds", i+1, slice.Len())
-			ithValue := reflect.Indirect(slice.Index(i))
 
-			//get pk and pv
-			pKey := ithValue.Type().Field(0).Name
-			pkeyVal := reflect.ValueOf(ithValue.Field(0).Interface())
-			pVal := fmt.Sprintf("%v", pkeyVal)
-			log.Println(pKey, pVal)
-			//finding cache
-			err := c.GetCache(slice.Index(i).Interface())
-			switch {
-			//no cache for this query, 1)fetch from db. 2)cache the record.
-			case err == redis.Nil:
-				sql := fmt.Sprintf("SELECT * FROM %s WHERE %s = %s", tableName, pKey, pVal)
-				log.Println(sql)
-				err := pgxscan.Select(ctx, c.Pool, dest, sql)
-				if err != nil {
-					panic(err)
-				}
-				//save to cache
-				c.SaveCache(slice.Index(i).Interface())
-			case err != nil:
+	for i := 0; i < slice.Len(); i++ {
+		log.Printf("the %d rounds\nmax:%d rounds", i+1, slice.Len())
+		ithValue := reflect.Indirect(slice.Index(i))
+
+		//get pv
+		pkeyVal := reflect.ValueOf(ithValue.Field(0).Interface())
+		pVal := fmt.Sprintf("%v", pkeyVal)
+
+		//getting cache
+		err := c.GetCache(slice.Index(i).Interface())
+		switch {
+		//no cache for this query, 1)fetch from db. 2)cache the record.
+		case err == redis.Nil:
+			sql := fmt.Sprintf("SELECT * FROM %s WHERE %s = %s", tableName, pKeyName, pVal)
+			log.Println(sql)
+			err := pgxscan.Select(ctx, c.Pool, dest, sql)
+			if err != nil {
 				panic(err)
 			}
-
+			//save to cache
+			if c.Cache != nil {
+				c.SaveCache(slice.Index(i).Interface())
+			}
+		case err != nil:
+			panic(err)
 		}
 
 	}
@@ -61,8 +61,10 @@ func (c *Client) Get(dest interface{}) error {
 	return nil
 }
 
-func CachedInsert() {
+// accept a pointer to a slice of pointers e.g., &[]*Bob{{Id:1},{Id:2},{Id:3}}
+func (c *Client) CachedInsert(model interface{}) error {
 
+	return nil
 }
 
 func CachedUpdate() {
