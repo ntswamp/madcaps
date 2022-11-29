@@ -18,17 +18,19 @@ import (
 // accept a pointer to a slice of pointers e.g., &[]*Bob{{Id:1},{Id:2},{Id:3}}
 func (c *Client) Get(dest interface{}) error {
 	ctx := context.Background()
-	destType := reflect.TypeOf(dest)
 	destVal := reflect.ValueOf(dest)
 	slice := destVal.Elem()
 
 	if slice.Index(0).Kind() != reflect.Ptr {
 		return errors.New("destination must be a pointer slice")
 	}
+
+	/***DEBUG
+	destType := reflect.TypeOf(dest)
 	tableName := destType.Elem().Elem().Elem().Name()
 	pKeyName := slice.Index(0).Type().Elem().Field(0).Name
-
 	fmt.Println("Table Name:", tableName, ", Pkey Name:", pKeyName, ", Slice:", slice)
+	***/
 
 	//look into cache
 	for i := 0; i < slice.Len(); i++ {
@@ -65,7 +67,10 @@ func (c *Client) Get(dest interface{}) error {
 			*/
 			//make cache
 			if c.Cache != nil {
-				c.SaveCache(slice.Index(i).Interface())
+				err = c.SaveCache(slice.Index(i).Interface())
+				if err != nil {
+					panic(err)
+				}
 			}
 		case err != nil:
 			panic(err)
@@ -77,8 +82,8 @@ func (c *Client) Get(dest interface{}) error {
 // accept a pointer to a slice of pointers e.g., &[]*Bob{{Id:1},{Id:2},{Id:3}}
 // the order is upsert to DB before upserting cache
 func (c *Client) Upsert(model interface{}) error {
-	//ctx := context.Background()
-	modelType := reflect.TypeOf(model)
+	ctx := context.Background()
+	//modelType := reflect.TypeOf(model)
 	modelVal := reflect.ValueOf(model)
 	//slice would be [*struct,*struct,*struct...]
 	slice := modelVal.Elem()
@@ -86,19 +91,16 @@ func (c *Client) Upsert(model interface{}) error {
 	if slice.Index(0).Kind() != reflect.Ptr {
 		return errors.New("accept only pointer slices")
 	}
-	tableName := modelType.Elem().Elem().Elem().Name()
-	pKeyName := slice.Index(0).Type().Elem().Field(0).Name
 
 	for i := 0; i < slice.Len(); i++ {
-		fmt.Printf("at the %d round\nmax:%d rounds", i+1, slice.Len())
-		ithValue := reflect.Indirect(slice.Index(i))
 
-		//get pv
-		pkeyVal := reflect.ValueOf(ithValue.Field(0).Interface())
-		pVal := fmt.Sprintf("%v", pkeyVal)
-
-		sql := fmt.Sprintf("SELECT * FROM %s WHERE %s = %s", tableName, pKeyName, pVal)
-		fmt.Println(sql)
+		_, err := c.Db.NewInsert().
+			Model(slice.Index(i).Interface()).
+			On("CONFLICT ?PKs DO UPDATE").
+			Exec(ctx)
+		if err != nil {
+			return err
+		}
 		/*
 			err := pgxscan.Select(ctx, c.Pool, dest, sql)
 			if err != nil {
@@ -107,17 +109,13 @@ func (c *Client) Upsert(model interface{}) error {
 		*/
 		//save to cache
 		if c.Cache != nil {
-			c.SaveCache(slice.Index(i).Interface())
+			err = c.SaveCache(slice.Index(i).Interface())
+			if err != nil {
+				panic(err)
+			}
 		}
-		//case err != nil:
-		//panic(err)
 	}
-
 	return nil
-}
-
-func CachedUpdate() {
-
 }
 
 func DeleteWithCache() {
@@ -129,7 +127,7 @@ type Client struct {
 	Db    *bun.DB
 }
 
-// keep in mind you are in responsible for closing the pool after use. "defer client.Close()"
+// keep in mind you are in responsible for closing the client afteruse: defer client.Close()
 func New() *Client {
 	dsn := "postgres://postgres:password@localhost:5432/madcaps?sslmode=disable"
 	sqldb := sql.OpenDB(pgdriver.NewConnector(pgdriver.WithDSN(dsn)))
@@ -175,7 +173,26 @@ func (c *Client) Insert(model interface{}) error {
 }
 */
 
-// accept a pointer of structs.
+// accept a pointer to a struct.
+func getPkName(model interface{}) string {
+	t := reflect.TypeOf(model).Elem()
+	if t.Kind() != reflect.Struct {
+		panic("bad type")
+	}
+	for i := 0; i < t.NumField(); i++ {
+		field := t.Field(i)
+		tags := strings.Split(field.Tag.Get("bun"), ",") // use split to ignore tag "options" like omitempty, etc.
+
+		for _, tag := range tags {
+			if tag == "pk" {
+				return field.Name
+			}
+		}
+	}
+	return ""
+}
+
+// accept a pointer to a struct.
 func getPkValue(model interface{}) string {
 	t := reflect.TypeOf(model).Elem()
 	v := reflect.ValueOf(model).Elem()
