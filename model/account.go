@@ -1,13 +1,15 @@
 package model
 
 import (
+	"math/big"
 	"time"
 
 	"github.com/uptrace/bun"
 )
 
 type Bee struct {
-	Size uint8
+	Size   uint8
+	Amount big.Int
 }
 
 type Account struct {

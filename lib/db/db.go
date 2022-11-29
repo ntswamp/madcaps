@@ -21,7 +21,7 @@ func (c *Client) Get(dest interface{}) error {
 	destType := reflect.TypeOf(dest)
 	destVal := reflect.ValueOf(dest)
 	slice := destVal.Elem()
-	//resultSlice := reflect.MakeSlice(slice.Elem().Type(), 0, 0)
+
 	if slice.Index(0).Kind() != reflect.Ptr {
 		return errors.New("destination must be a pointer slice")
 	}
