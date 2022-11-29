@@ -63,13 +63,15 @@ func main() {
 		   		'UA1151', 'Banana', 'zh', 'tokentest', '343242', '82', '1961-06-16'
 		   	)`
 		*/
-		accounts := []*model.Account{{Id: 1}}
-		err := db.Get(accounts)
-		if err != nil {
-			panic(err)
-		}
-		fmt.Println(*accounts[0])
 	}
+
+	accounts := []*model.Account{{Id: 1}}
+	err := db.Get(&accounts)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println(*accounts[0])
+
 }
 func mike() {
 	db := db.New()

@@ -12,50 +12,52 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// always look into cache first, go DB if no cache is found.
+// accept a pointer to a slice of pointers e.g., &[]*Bob{{Id:1},{Id:2},{Id:3}}
 func (c *Client) Get(dest interface{}) error {
 	modelType := reflect.TypeOf(dest)
 	ctx := context.Background()
 
-	switch modelType.Kind() {
-	case reflect.Slice:
-		slice := reflect.ValueOf(dest)
-		if slice.Index(0).Kind() != reflect.Ptr {
-			return errors.New("destination must be a pointer slice")
-		}
-		table := modelType.Elem().Elem().Name()
-		sql := fmt.Sprintf("SELECT * FROM %s", table)
-		//look into cache
-		if c.Cache != nil {
-			for i := 0; i < slice.Len(); i++ {
-				log.Printf("the %d rounds\nmax:%d rounds", i+1, slice.Len())
-				ithValue := reflect.Indirect(slice.Index(i))
-				log.Printf("%v\n", slice.Index(i))
-				//pkeyVal := reflect.ValueOf(ithValue.Field(0).Interface())
-				//field := fmt.Sprintf("%v", pkeyVal)
-				//vp := reflect.New(reflect.TypeOf(ithValue))
-				err := c.GetCache(&ithValue)
-				switch {
-				//no cache for this query, 1)fetch from db. 2)cache the record.
-				case err == redis.Nil:
-					err := pgxscan.Select(ctx, c.Pool, &dest, sql)
-					if err != nil {
-						panic(err)
-					}
-					//save to cache
-					c.SaveCache(&ithValue)
-				case err != nil:
+	destVal := reflect.ValueOf(dest)
+	slice := destVal.Elem()
+	//resultSlice := reflect.MakeSlice(slice.Elem().Type(), 0, 0)
+	if slice.Index(0).Kind() != reflect.Ptr {
+		return errors.New("destination must be a pointer slice")
+	}
+	tableName := modelType.Elem().Elem().Elem().Name()
+	log.Println("Table Name:", tableName)
+
+	//look into cache
+	if c.Cache != nil {
+		for i := 0; i < slice.Len(); i++ {
+			log.Printf("the %d rounds\nmax:%d rounds", i+1, slice.Len())
+			ithValue := reflect.Indirect(slice.Index(i))
+
+			//get pk and pv
+			pKey := ithValue.Type().Field(0).Name
+			pkeyVal := reflect.ValueOf(ithValue.Field(0).Interface())
+			pVal := fmt.Sprintf("%v", pkeyVal)
+			log.Println(pKey, pVal)
+			//finding cache
+			err := c.GetCache(slice.Index(i).Interface())
+			switch {
+			//no cache for this query, 1)fetch from db. 2)cache the record.
+			case err == redis.Nil:
+				sql := fmt.Sprintf("SELECT * FROM %s WHERE %s = %s", tableName, pKey, pVal)
+				log.Println(sql)
+				err := pgxscan.Select(ctx, c.Pool, dest, sql)
+				if err != nil {
 					panic(err)
 				}
-
+				//save to cache
+				c.SaveCache(slice.Index(i).Interface())
+			case err != nil:
+				panic(err)
 			}
 
 		}
 
-	default:
-		//handle errors
-
 	}
+
 	return nil
 }
 
