@@ -1,7 +1,7 @@
 package main
 
 import (
-	"context"
+	"database/sql"
 	"fmt"
 	"server/lib/db"
 	"server/model"
@@ -10,8 +10,19 @@ import (
 func main() {
 
 	db := db.New()
-	db.Pool.Ping(context.Background())
-	defer db.Pool.Close()
+	defer db.Close()
+
+	accounts := []*model.Account{{Id: 1}, {Id: 2}, {Id: 4}}
+	err := db.Get(&accounts)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			panic(err)
+		}
+	}
+	for _, a := range accounts {
+		fmt.Println(*a)
+	}
+
 	/*
 		{
 			//REDIS
@@ -47,12 +58,5 @@ func main() {
 			db.SaveCache(m)
 		}
 	*/
-
-	accounts := []*model.Account{{Id: 1}}
-	err := db.Get(&accounts)
-	if err != nil {
-		panic(err)
-	}
-	fmt.Println(*accounts[0])
 
 }
