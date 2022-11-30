@@ -15,6 +15,53 @@ import (
 	"github.com/uptrace/bun/extra/bundebug"
 )
 
+type Client struct {
+	Cache *redis.Client
+	Db    *bun.DB
+	Tx    *bun.Tx
+}
+
+// keep in mind you are in responsible for closing the client afteruse: defer client.Close()
+func New(isCaching bool) *Client {
+	dsn := "postgres://postgres:password@localhost:5432/madcaps?sslmode=disable"
+	sqldb := sql.OpenDB(pgdriver.NewConnector(pgdriver.WithDSN(dsn)))
+	db := bun.NewDB(sqldb, pgdialect.New())
+	db.AddQueryHook(bundebug.NewQueryHook(bundebug.WithVerbose(true)))
+
+	var redis *redis.Client = nil
+	if isCaching {
+		redis = redisClient()
+	}
+	return &Client{
+		Db:    db,
+		Cache: redis,
+	}
+}
+
+func (c *Client) Close() {
+	c.Db.Close()
+	c.Cache.Close()
+	c.Tx = nil
+}
+
+func (c *Client) BeginTx() error {
+	tx, err := c.Db.BeginTx(context.Background(), &sql.TxOptions{})
+	if err != nil {
+		return err
+	}
+	c.Tx = &tx
+	return nil
+}
+
+func (c *Client) CommitTx() error {
+	err := c.Tx.Commit()
+	if err != nil {
+		return err
+	}
+	//c.Tx = nil
+	return nil
+}
+
 // accept a pointer to a slice of pointers e.g., &[]*Bob{{Id:1},{Id:2},{Id:3}}
 func (c *Client) Get(dest interface{}) error {
 	ctx := context.Background()
@@ -94,11 +141,12 @@ func (c *Client) Upsert(model interface{}) error {
 
 	for i := 0; i < slice.Len(); i++ {
 
-		_, err := c.Db.NewInsert().
+		_, err := c.Tx.NewInsert().
 			Model(slice.Index(i).Interface()).
 			On("CONFLICT (?PKs) DO UPDATE").
 			Exec(ctx)
 		if err != nil {
+			c.Tx.Rollback()
 			return err
 		}
 		/*
@@ -118,33 +166,44 @@ func (c *Client) Upsert(model interface{}) error {
 	return nil
 }
 
-func DeleteWithCache() {
+// Delete caches before deleting DB rows
+func (c *Client) Delete(model interface{}) error {
+	ctx := context.Background()
+	modelVal := reflect.ValueOf(model)
+	slice := modelVal.Elem()
 
-}
-
-type Client struct {
-	Cache *redis.Client
-	Db    *bun.DB
-}
-
-// keep in mind you are in responsible for closing the client afteruse: defer client.Close()
-func New() *Client {
-	dsn := "postgres://postgres:password@localhost:5432/madcaps?sslmode=disable"
-	sqldb := sql.OpenDB(pgdriver.NewConnector(pgdriver.WithDSN(dsn)))
-	db := bun.NewDB(sqldb, pgdialect.New())
-	db.AddQueryHook(bundebug.NewQueryHook(bundebug.WithVerbose(true)))
-
-	redis := redisClient()
-
-	return &Client{
-		Db:    db,
-		Cache: redis,
+	if slice.Index(0).Kind() != reflect.Ptr {
+		return errors.New("accept only pointer slices")
 	}
-}
 
-func (c *Client) Close() {
-	c.Db.Close()
-	c.Cache.Close()
+	/***DEBUG
+	destType := reflect.TypeOf(dest)
+	tableName := destType.Elem().Elem().Elem().Name()
+	pKeyName := slice.Index(0).Type().Elem().Field(0).Name
+	fmt.Println("Table Name:", tableName, ", Pkey Name:", pKeyName, ", Slice:", slice)
+	***/
+
+	//look into cache
+	for i := 0; i < slice.Len(); i++ {
+		//get primary key value
+		pVal := getPkValue(slice.Index(i).Interface())
+
+		//delete cache
+		if c.Cache != nil {
+			err := c.DeleteCache(slice.Index(i).Interface())
+			if err != nil {
+				panic(err)
+			}
+		}
+
+		_, err := c.Tx.NewDelete().Model(slice.Index(i).Interface()).Where("?PKs = ?", pVal).Exec(ctx)
+		if err != nil {
+			c.Tx.Rollback()
+			return err
+		}
+
+	}
+	return nil
 }
 
 /*

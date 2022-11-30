@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"reflect"
 
 	"github.com/go-redis/redis/v9"
@@ -31,37 +30,38 @@ func (c *Client) SaveCache(model interface{}) error {
 		}
 		return nil
 
-	//cache multiple objects by passing in a pointer slice e.g., []*Bob{&a,&b,&c}
-	case reflect.Slice:
-		slice := reflect.ValueOf(model)
-		if slice.Index(0).Kind() != reflect.Ptr {
-			return errors.New("multiple models must be passed in as a pointer slice")
-		}
+	//cache multiple objects by passing in a slice pointer e.g., b:=[]*Bob{&a,&b,&c}; c.SaveCache(&b)
+	/*
+		case reflect.Slice:
+			slice := reflect.ValueOf(model)
+			if slice.Index(0).Kind() != reflect.Ptr {
+				return errors.New("multiple models must be passed in as a pointer slice")
+			}
 
-		key := modelType.Elem().Elem().Name()
-		if _, err := c.Cache.Pipelined(ctx, func(p redis.Pipeliner) error {
-			for i := 0; i < slice.Len(); i++ {
-				modelValue := reflect.Indirect(slice.Index(i))
-				pkeyVal := reflect.ValueOf(modelValue.Field(0).Interface())
-				field := fmt.Sprintf("%v", pkeyVal)
-				//serialize
-				val, err := json.Marshal(modelValue.Interface())
-				if err != nil {
-					return err
+			key := modelType.Elem().Elem().Name()
+			if _, err := c.Cache.Pipelined(ctx, func(p redis.Pipeliner) error {
+				for i := 0; i < slice.Len(); i++ {
+					modelValue := reflect.Indirect(slice.Index(i))
+					pkeyVal := reflect.ValueOf(modelValue.Field(0).Interface())
+					field := fmt.Sprintf("%v", pkeyVal)
+					//serialize
+					val, err := json.Marshal(modelValue.Interface())
+					if err != nil {
+						return err
+					}
+
+					err = p.HSet(ctx, key, field, val).Err()
+					if err != nil {
+						return err
+					}
+
 				}
-
-				err = p.HSet(ctx, key, field, val).Err()
-				if err != nil {
-					return err
-				}
-
+				return nil
+			}); err != nil {
+				panic(err)
 			}
 			return nil
-		}); err != nil {
-			panic(err)
-		}
-		return nil
-
+	*/
 	default:
 		return errors.New("passed in model(s) must be a pointer or a slice of pointers")
 	}
@@ -109,6 +109,74 @@ func (c *Client) GetCache(destModel interface{}) error {
 	}
 }
 
+// pass in a pointer or a slice of pointers
+func (c *Client) DeleteCache(model interface{}) error {
+	modelType := reflect.TypeOf(model)
+	ctx := context.Background()
+
+	switch modelType.Kind() {
+	//cache single object by passing in a pointer
+	case reflect.Ptr:
+		key := modelType.Elem().Name()
+		field := getPkValue(model)
+
+		err := c.Cache.HDel(ctx, key, field).Err()
+		if err != nil {
+			return err
+		}
+		return nil
+
+	//cache multiple objects by passing in a slice pointer e.g., b:=[]*Bob{&a,&b,&c}; c.SaveCache(&b)
+	/*
+		case reflect.Slice:
+			slice := reflect.ValueOf(model)
+			if slice.Index(0).Kind() != reflect.Ptr {
+				return errors.New("multiple models must be passed in as a pointer slice")
+			}
+
+			key := modelType.Elem().Elem().Name()
+			if _, err := c.Cache.Pipelined(ctx, func(p redis.Pipeliner) error {
+				for i := 0; i < slice.Len(); i++ {
+					modelValue := reflect.Indirect(slice.Index(i))
+					pkeyVal := reflect.ValueOf(modelValue.Field(0).Interface())
+					field := fmt.Sprintf("%v", pkeyVal)
+					//serialize
+					val, err := json.Marshal(modelValue.Interface())
+					if err != nil {
+						return err
+					}
+
+					err = p.HSet(ctx, key, field, val).Err()
+					if err != nil {
+						return err
+					}
+
+				}
+				return nil
+			}); err != nil {
+				panic(err)
+			}
+			return nil
+	*/
+	default:
+		return errors.New("passed in model(s) must be a pointer or a slice of pointers")
+	}
+
+	/*
+		key := makeCacheKeyName(model)
+		if _, err := rc.Pipelined(ctx, func(p redis.Pipeliner) error {
+			for i := 0; i < modelVal.NumField(); i++ {
+				field := reflect.ValueOf(modelVal.Field(i).Interface())
+				//fmt.Println(modelVal.Type().Field(i).Type == time.Time)
+				p.HSet(ctx, key, modelVal.Type().Field(i).Name, fmt.Sprintf("%v", field))
+			}
+			return nil
+		}); err != nil {
+			return err
+		}
+		return nil
+	*/
+}
 func redisClient() *redis.Client {
 	rc := redis.NewClient(&redis.Options{
 		Addr:     "localhost:6379",

@@ -19,6 +19,7 @@ type Account struct {
 	Age       int64
 	CreatedAt time.Time
 	Name      string
+	Item      []int64 `bun:",array"`
 	Bot       *Bee
 
 	bun.BaseModel `bun:"table:accounts"`
