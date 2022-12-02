@@ -39,8 +39,12 @@ func New(isCaching bool) *Client {
 }
 
 func (c *Client) Close() {
-	c.Db.Close()
-	c.Cache.Close()
+	if c.Db != nil {
+		c.Db.Close()
+	}
+	if c.Cache != nil {
+		c.Cache.Close()
+	}
 	c.Tx = nil
 }
 
